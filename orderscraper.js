@@ -42,9 +42,9 @@ async function scrapeOrders() {
           new Object({
             Count: i.getElementsByClassName("orderHistoryQuantity")[0]
               .innerText,
-            Name: i
+            Name: "\""+i
               .getElementsByClassName("orderHistoryItems")[0]
-              .getElementsByTagName("a")[0].innerText,
+              .getElementsByTagName("a")[0].innerText+"\"",
             Edition:
               setcodes[
                 i
