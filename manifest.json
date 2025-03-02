@@ -18,6 +18,7 @@
   ],
   "permissions": [
     "storage",
+    "downloads",
     "https://api.scryfall.com/*"
   ],
   "background": {
