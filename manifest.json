@@ -1,0 +1,19 @@
+{
+    "manifest_version": 2,
+    "name": "TCGPlayer Order Scraper",
+    "version": "1.0",
+  
+    "description": "Scrapes your order history page on tcgplayer.com and exports it as a .csv for import elsewhere.",
+  
+    "icons": {
+      "48": "icons/icon.svg"
+    },
+  
+    "content_scripts": [
+      {
+        "matches": ["*://*.tcgplayer.com/myaccount/orderhistory*"],
+        "js": ["orderscraper.js"]
+      }
+    ]
+  }
+  
