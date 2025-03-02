@@ -1,6 +1,3 @@
-const startdate = new Date("Feb 12, 2025");
-const enddate = new Date();
-
 function jsonToCsv(jsonData) {
   let csv = "";
 
@@ -19,12 +16,11 @@ function jsonToCsv(jsonData) {
 
 async function scrapeOrders() {
   let setcodes = (await browser.storage.local.get("setcodes")).setcodes;
+
   let orders = [];
 
   //extract raw orders
   const raw_orders = document.getElementsByClassName("orderWrap");
-  console.log("RAW ORDERS:");
-  console.log(raw_orders);
 
   //create json from raw orders
   for (const x of raw_orders) {
@@ -60,7 +56,8 @@ async function scrapeOrders() {
             Condition: i
               .getElementsByClassName("orderHistoryDetail")[0]
               .innerText.split("Condition: ")[1]
-              .split(" Foil")[0].replace("Moderately ", ""),
+              .split(" Foil")[0]
+              .replace("Moderately ", ""),
             Foil:
               i
                 .getElementsByClassName("orderHistoryDetail")[0]
@@ -80,16 +77,36 @@ async function scrapeOrders() {
 }
 
 //filter orders by date range then create array of items
-function formatOrders(orders) {
-    filtered = orders.filter((order) => order.date > startdate && order.date < enddate);
-    finalitems = [];
-    for (let order of filtered) {
-        for (let item of order.items) {
-            finalitems.push(item)
-        };
-    };
-    return finalitems;
+async function formatOrders(orders) {
+  const startdate = new Date(
+    (await browser.storage.local.get("dateRange")).dateRange.startDate
+  );
+  const enddate = new Date(
+    (await browser.storage.local.get("dateRange")).dateRange.endDate
+  );
+
+  filtered = orders.filter(
+    (order) => order.date > startdate && order.date < enddate
+  );
+  finalitems = [];
+  for (let order of filtered) {
+    for (let item of order.items) {
+      finalitems.push(item);
+    }
+  }
+  return finalitems;
 }
 
 // Send the CSV data to the background script
-scrapeOrders().then(x=> browser.runtime.sendMessage({ action: "downloadCSV", data: jsonToCsv(formatOrders(x)) }));
+browser.runtime.onMessage.addListener(async (message, sender, sendResponse) => {
+  if (message.action === "scrape") {
+    let orders = await scrapeOrders();
+    let finalitems = await formatOrders(orders);
+    let csv = jsonToCsv(finalitems);
+
+    browser.runtime.sendMessage({
+      action: "downloadCSV",
+      data: csv,
+    });
+  }
+});
