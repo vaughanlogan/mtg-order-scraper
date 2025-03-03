@@ -18,8 +18,8 @@ async function getSetData() {
     console.error(
       "Failed to fetch set data from https://api.scryfall.com/sets"
     );
-  }
-}
+  };
+};
 
 //define csv download function
 function downloadCSV(csvString, filename = "orderdata.csv") {
@@ -38,7 +38,7 @@ function downloadCSV(csvString, filename = "orderdata.csv") {
 
   // Revoke the object URL after a short delay to free up memory
   setTimeout(() => URL.revokeObjectURL(url), 1000);
-}
+};
 
 //initialize extension
 browser.runtime.onInstalled.addListener(() => {
@@ -49,21 +49,29 @@ browser.runtime.onInstalled.addListener(() => {
 browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === "downloadCSV") {
     downloadCSV(message.data);
-  }
+  };
 });
 
-//save date range
-browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
+//run extension when button is pressed
+browser.runtime.onMessage.addListener(async (message, sender, sendResponse) => {
   if (message.action === "runExtension") {
     const { startDate, endDate } = message;
 
     // Store the date range in browser.storage.local (including defaults)
     browser.storage.local.set({ dateRange: { startDate, endDate } });
 
+    //check to see if set data needs to be refreshed
+    let lastsetscall = (await browser.storage.local.get("lastsetscall")).lastsetscall;
+    if (new Date() - lastsetscall > 24*60*60*1000) {
+      console.log("Getting new set data...")
+      getSetData();
+    };
+
+    //activate scraper
     browser.tabs.query({ active: true, currentWindow: true }, (tabs) => {
       browser.tabs.sendMessage(tabs[0].id, {
         action: "scrape",
       });
     });
-  }
+  };
 });
