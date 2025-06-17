@@ -24,7 +24,7 @@ async function getCardData(id) {
 			{
 				headers: {
 					"User-Agent":
-						"TCGPlayer MTG Order Scraper/v1.1 by Vaughan Logan (Firefox add-on)",
+						"TCGPlayer MTG Order Scraper/v1.1 by Vaughan Logan (Browser extension)",
 					Accept: "*/*",
 				},
 			}
@@ -62,33 +62,30 @@ function downloadCSV(csvString, filename = "orderdata.csv") {
 browser.runtime.onInstalled.addListener(() => {});
 
 //parse scraped items
-browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
+browser.runtime.onMessage.addListener(async (message, sender, sendResponse) => {
 	if (message.action === "receiveItems") {
-		(async () => {
-			let items = message.data;
+		let items = message.data;
 
-			let final_items = [];
+		let final_items = [];
 
-			for (let item of items) {
-				let item_data = await getCardData(item.id);
+		for (let item of items) {
+			let item_data = await getCardData(item.id);
 
-				let item_obj = {
-					Name: item_data.name,
-					Edition: item_data.set,
-					Language: item_data.lang,
-					"Collector Number": item_data.collector_number,
-					Condition: item.Condition,
-					Foil: item.Foil,
-					Price: item.Price,
-					Count: item.Count,
-				};
+			let item_obj = {
+				Name: `"${item_data.name}"`,
+				Edition: item_data.set,
+				Language: item_data.lang,
+				"Collector Number": item_data.collector_number,
+				Condition: item.Condition,
+				Foil: item.Foil,
+				Price: item.Price,
+				Count: item.Count,
+			};
 
-				final_items.push(item_obj);
-			}
+			final_items.push(item_obj);
+		}
 
-			downloadCSV(jsonToCsv(final_items));
-		})();
-		return true;
+		downloadCSV(jsonToCsv(final_items));
 	}
 });
 
