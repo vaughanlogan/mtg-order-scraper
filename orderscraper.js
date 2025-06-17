@@ -1,112 +1,105 @@
-function jsonToCsv(jsonData) {
-  let csv = "";
-
-  // Extract headers
-  const headers = Object.keys(jsonData[0]);
-  csv += headers.join(",") + "\n";
-
-  // Extract values
-  jsonData.forEach((obj) => {
-    const values = headers.map((header) => obj[header]);
-    csv += values.join(",") + "\n";
-  });
-
-  return csv;
-}
-
 async function scrapeOrders() {
-  let setcodes = (await browser.storage.local.get("setcodes")).setcodes;
+	let orders = [];
 
-  let orders = [];
+	//extract raw orders
+	const raw_orders = document.querySelectorAll(".orderWrap");
 
-  //extract raw orders
-  const raw_orders = document.getElementsByClassName("orderWrap");
+	//create json from raw orders
+	for (let order of raw_orders) {
+		let order_date = new Date(
+			order.querySelector(
+				'[data-aid="spn-sellerorderwidget-orderdate"]'
+			).innerText
+		);
 
-  //create json from raw orders
-  for (const x of raw_orders) {
-    orders.push({
-      date: new Date(
-        x.querySelector(
-          '[data-aid="spn-sellerorderwidget-orderdate"]'
-        ).innerText
-      ),
-      id: x
-        .getElementsByClassName("orderHeader")[0]
-        .children[2].innerText.split("\n")[1],
-      items: Array.from(
-        x
-          .getElementsByClassName("orderTable")[0]
-          .querySelectorAll(".trOdd,.trEven")
-      ).map(
-        (i) =>
-          new Object({
-            Count: i.getElementsByClassName("orderHistoryQuantity")[0]
-              .innerText,
-            Name: "\""+i
-              .getElementsByClassName("orderHistoryItems")[0]
-              .getElementsByTagName("a")[0].innerText+"\"",
-            Edition:
-              setcodes[
-                i
-                  .getElementsByClassName("orderHistoryItems")[0]
-                  .getElementsByTagName("span")[0]
-                  .innerText.split("\n")[1]
-                  .trimEnd()
-              ],
-            Condition: i
-              .getElementsByClassName("orderHistoryDetail")[0]
-              .innerText.split("Condition: ")[1]
-              .split(" Foil")[0]
-              .replace("Moderately ", ""),
-            Foil:
-              i
-                .getElementsByClassName("orderHistoryDetail")[0]
-                .innerText.split("Condition: ")[1]
-                .split(" Foil").length == 2,
-            "Purchase Price": parseFloat(
-              i
-                .getElementsByClassName("orderHistoryPrice")[0]
-                .innerText.substring(1)
-            ),
-          })
-      ),
-    });
-  }
+		let order_number = order
+			.querySelector(".orderHeader")
+			.children[2].innerText.split("\n")[1];
 
-  return orders;
+		let raw_order_items = order.querySelectorAll(".trOdd, .trEven");
+
+		let order_items = [];
+
+		for (let item of raw_order_items) {
+			let item_id = item
+				.querySelector(".orderThumbnail")
+				.attributes["data-original"].value.split("product/")[1]
+				.split("_")[0];
+
+			let item_cond = item
+				.querySelector(".orderHistoryDetail")
+				.innerText.split("Condition: ")[1]
+				.split(" Foil")[0];
+
+			let item_foil = item
+				.querySelector(".orderHistoryDetail")
+				.innerText.includes("Foil")
+				? "foil"
+				: "";
+
+			let item_price = item
+				.querySelector(".orderHistoryPrice")
+				.innerText.split("$")[1];
+
+			let item_count = item.querySelector(".orderHistoryQuantity").innerText;
+
+			let item_obj = {
+				id: item_id,
+				Name: "",
+				Edition: "",
+				Language: "",
+				"Collector Number": "",
+				Condition: item_cond,
+				Foil: item_foil,
+				Price: item_price,
+				Count: item_count,
+			};
+
+			order_items.push(item_obj);
+		}
+
+		let order_obj = {
+			number: order_number,
+			date: order_date,
+			items: order_items,
+		};
+
+		orders.push(order_obj);
+	}
+
+	return orders;
 }
 
 //filter orders by date range then create array of items
 async function formatOrders(orders) {
-  const startdate = new Date(
-    (await browser.storage.local.get("dateRange")).dateRange.startDate
-  );
-  const enddate = new Date(
-    (await browser.storage.local.get("dateRange")).dateRange.endDate
-  );
+	const startdate = new Date(
+		(await browser.storage.local.get("dateRange")).dateRange.startDate
+	);
+	const enddate = new Date(
+		(await browser.storage.local.get("dateRange")).dateRange.endDate
+	);
 
-  filtered = orders.filter(
-    (order) => order.date > startdate && order.date < enddate
-  );
-  finalitems = [];
-  for (let order of filtered) {
-    for (let item of order.items) {
-      finalitems.push(item);
-    }
-  }
-  return finalitems;
+	filtered = orders.filter(
+		(order) => order.date > startdate && order.date < enddate
+	);
+	finalitems = [];
+	for (let order of filtered) {
+		for (let item of order.items) {
+			finalitems.push(item);
+		}
+	}
+	return finalitems;
 }
 
 // Send the CSV data to the background script
 browser.runtime.onMessage.addListener(async (message, sender, sendResponse) => {
-  if (message.action === "scrape") {
-    let orders = await scrapeOrders();
-    let finalitems = await formatOrders(orders);
-    let csv = jsonToCsv(finalitems);
+	if (message.action === "scrape") {
+		let orders = await scrapeOrders();
+		let scraped_items = await formatOrders(orders);
 
-    browser.runtime.sendMessage({
-      action: "downloadCSV",
-      data: csv,
-    });
-  }
+		browser.runtime.sendMessage({
+			action: "receiveItems",
+			data: scraped_items,
+		});
+	}
 });
